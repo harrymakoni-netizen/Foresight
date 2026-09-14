@@ -1,21 +1,9 @@
-import { env } from 'cloudflare:workers';
-import { getChatGPTUser } from '../../chatgpt-auth';
-import { zones } from '@/lib/model';
-
-async function identity(){
-  const user=await getChatGPTUser();
-  if(user) return {owner:user.userId,actor:user.displayName};
-  if(import.meta.env.DEV) return {owner:'local-preview',actor:'Local preview developer'};
-  return null;
-}
-export async function GET(){
-  const user=await identity(); if(!user) return Response.json({error:'Please sign in to save and view your preview records.'},{status:401});
-  try {
-    const records=await env.DB!.prepare('SELECT * FROM records WHERE owner = ? ORDER BY created_at DESC').bind(user.owner).all();
-    const audit=await env.DB!.prepare('SELECT * FROM audits WHERE owner = ? ORDER BY id DESC LIMIT 300').bind(user.owner).all();
-    return Response.json({records:records.results.map((r:any)=>({...r,data:JSON.parse(r.data),createdAt:r.created_at})),audit:audit.results,actor:user.actor},{headers:{'Cache-Control':'no-store'}});
-  }catch {return Response.json({error:'The record store is unavailable. Changes have not been saved. Please retry.'},{status:503});}
-}
+import {identity} from '@/lib/auth';
+import {readState,saveState,BlobPreconditionFailedError} from '@/lib/storage';
+import {zones} from '@/lib/model';
+export const runtime='nodejs';
+export const dynamic='force-dynamic';
+export async function GET(){const user=await identity();if(!user)return Response.json({error:'Sign in is required.'},{status:401});try{const {state}=await readState();return Response.json({...state,actor:user.actor},{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({error:'The record store is unavailable. Changes have not been saved.'},{status:503});}}
 export async function POST(request:Request){
   const user=await identity(); if(!user) return Response.json({error:'Sign in is required.'},{status:401});
   if(request.headers.get('origin') && request.headers.get('origin')!==new URL(request.url).origin) return Response.json({error:'Cross-origin write rejected.'},{status:403});
@@ -33,27 +21,25 @@ export async function POST(request:Request){
     if(p.kind==='inspection'&&!Number.isFinite(Date.parse(data.dueAt))) throw new Error('Original inspection due date is required.');
     if(p.kind==='lite'&&(!Number.isInteger(Number(data.headcount))||Number(data.headcount)<1||Number(data.headcount)>100)) throw new Error('Headcount must be between 1 and 100.');
     const id=typeof p.id==='string'?p.id:crypto.randomUUID(); const now=new Date().toISOString();
-    const existing=await env.DB!.prepare('SELECT * FROM records WHERE id = ? AND owner = ?').bind(id,user.owner).first<any>();
+    const {state,etag}=await readState();const existing=state.records.find(r=>r.id===id);if(state.audit.length>=10000)throw new Error('Preview record capacity reached. Export records before extending this workspace.');
     if(p.id&&!existing) throw new Error('Record not found. Refresh and retry.');
     if(existing&&existing.kind!==p.kind) throw new Error('Record type cannot change.');
     if(existing&&['decision','inspection','notification'].includes(p.kind)) throw new Error('This audit record is append-only.');
-    if(existing&&p.expectedVersion!==JSON.parse(existing.data).version) return Response.json({error:'This record was changed in another session. Refresh before trying again.'},{status:409});
+    if(existing&&p.expectedVersion!==existing.data.version) return Response.json({error:'This record was changed in another session. Refresh before trying again.'},{status:409});
     if(p.kind==='muster'){
       if(existing){
         if(existing.zone!==p.zone) throw new Error('A muster snapshot cannot change zones.');
-        const prior=JSON.parse(existing.data);
+        const prior=existing.data;
         data.members=prior.members.map((m:any)=>m.confirmed?m:data.members?.some((n:any)=>n.id===m.id&&n.confirmed===true)?{...m,confirmed:true,actor:user.actor,at:now}:m);
       }else{
-        const crew=await env.DB!.prepare("SELECT id,data FROM records WHERE owner = ? AND zone = ? AND kind = 'worker'").bind(user.owner,p.zone).all<any>();
-        data.members=crew.results.filter(r=>JSON.parse(r.data).status!=='checked-out').map(r=>({id:r.id,name:JSON.parse(r.data).name,confirmed:false}));
+        data.members=state.records.filter(r=>r.kind==='worker'&&r.zone===p.zone&&r.data.status!=='checked-out').map(r=>({id:r.id,name:r.data.name,confirmed:false}));
       }
     }
-    data.version=(existing?JSON.parse(existing.data).version||0:0)+1;
+    data.version=(existing?existing.data.version||0:0)+1;
     data.label='SIMULATOR PREVIEW RECORD'; data.actor=user.actor;
-    const write=existing ? env.DB!.prepare('UPDATE records SET zone = ?, data = ? WHERE id = ? AND owner = ? AND data = ?').bind(p.zone,JSON.stringify(data),id,user.owner,existing.data) : env.DB!.prepare('INSERT INTO records (id,owner,kind,zone,data,created_at) VALUES (?,?,?,?,?,?)').bind(id,user.owner,p.kind,p.zone,JSON.stringify(data),now);
-    const audit=env.DB!.prepare('INSERT INTO audits (owner,actor,action,record_id,detail,created_at) SELECT ?,?,?,?,?,? WHERE changes() = 1').bind(user.owner,user.actor,existing?'Updated '+p.kind:'Created '+p.kind,id,JSON.stringify({zone:p.zone,before:existing?JSON.parse(existing.data):null,after:data}),now);
-    const result=await env.DB!.batch([write,audit]);
-    if(!result[0].meta.changes) return Response.json({error:'Concurrent change detected. Refresh and retry.'},{status:409});
+    const record={id,kind:p.kind,zone:p.zone,data,createdAt:existing?.createdAt||now};
+    const next={records:existing?state.records.map(r=>r.id===id?record:r):[record,...state.records],audit:[{id:crypto.randomUUID(),owner:user.owner,actor:user.actor,action:(existing?'Updated ':'Created ')+p.kind,record_id:id,detail:JSON.stringify({zone:p.zone,before:existing?.data||null,after:data}),created_at:now},...state.audit]};
+    await saveState(next,etag);
     return Response.json({id},{status:existing?200:201});
-  }catch(e){return Response.json({error:e instanceof Error?e.message:'Could not save record.'},{status:400});}
+  }catch(e){if(e instanceof BlobPreconditionFailedError)return Response.json({error:'Concurrent change detected. Refresh and retry.'},{status:409});return Response.json({error:e instanceof Error?e.message:'Could not save record.'},{status:400});}
 }
