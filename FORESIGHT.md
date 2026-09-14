@@ -1,13 +1,13 @@
 # Foresight software preview
 
-Private owner access-key authenticated simulator workspace. No hardware or telecom integration.
+Public shared simulator workspace; no sign-in required. No hardware or telecom integration.
 
 - Command Centre and zone evidence: immutable Python engine replay, five development experiments, current and retained peak evidence, unknowns, interactions, register hash and full JSON export.
 - WorkerSafe: durable registration, zone moves, checkout, named muster confirmation with a server-generated roster snapshot.
 - Inspections: append-only completion/finding/deferral records with original due dates.
 - MineShield: incident records and response updates, affected people, category, chronological before/after audit, downloadable report.
 - Lite: fictional buddy check-in, expected return, 30-minute demo grace, checkout and a simulated notification outbox. No SMS, USSD or emergency call is sent.
-- All writes require server-side session identity, owner isolation, zone validation, concurrency checks and an atomic audit entry.
+- Writes use an explicitly unverified public demo actor, zone validation, concurrency checks and an atomic audit entry. Anyone can view and edit the shared demo records.
 
 Workflow records are separate from historical risk replay. No workflow entry rescores old evidence, clears a zone or issues an automatic equipment command. The hosted preview requires connectivity; it does not claim offline synchronization. Local offline simulation remains in the parent Python project. Do not enter real workforce or contact information in this demonstration.
 

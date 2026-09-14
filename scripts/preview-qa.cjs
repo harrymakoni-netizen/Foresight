@@ -4,7 +4,6 @@ const fs=require('node:fs');
  const browser=await chromium.launch({headless:true,channel:"msedge"}); const page=await browser.newPage({viewport:{width:1440,height:1100}});
  const runId=Date.now().toString(); const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://localhost:5175/',{waitUntil:'networkidle'});
- const envText=fs.readFileSync('.env.local','utf8');const accessKey=JSON.parse(envText.match(/^WORKSAFE_ACCESS_KEY=(.*)$/m)[1]);await page.getByLabel('Access key',{exact:true}).fill(accessKey);await page.getByRole('button',{name:'Open WorkerSafe',exact:true}).click();
  await page.getByText('Records connected',{exact:true}).waitFor({timeout:60000});
  fs.mkdirSync('outputs',{recursive:true});await page.screenshot({path:'outputs/desktop.png',fullPage:true});
  await page.getByRole('button',{name:'WorkerSafe',exact:true}).click();
