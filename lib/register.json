@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "version": "provisional-0.3.0",
+  "status": "provisional_unvalidated",
+  "purpose": "Simulator development only; not approved for operational reliance",
+  "basis": "Development proposal Sections 8 and Appendix A; all numeric parameters are engineering test assumptions, not mining guidance",
+  "bands": {
+    "elevated": 30,
+    "high": 60
+  },
+  "history": {
+    "recent_hours": 6,
+    "baseline_hours": 48,
+    "minimum_coverage": 0.66,
+    "measurement_stale_hours": 3,
+    "operational_stale_hours": 12,
+    "maximum_gap_hours": 3,
+    "water_rate_floor_m_per_hour": 0.01,
+    "pump_duty_floor": 0.05,
+    "pump_recent_hours": 24,
+    "pump_baseline_hours": 72
+  },
+  "evaluation": {
+    "match_window_hours": 48,
+    "late_window_hours": 24
+  },
+  "factors": [
+    {
+      "id": "water_rate",
+      "group": "hydrology",
+      "role": "risk",
+      "unit": "multiple_of_prior_positive_rate",
+      "start": 1.5,
+      "full": 4,
+      "weight": 25,
+      "action": "Ask the responsible person to verify pump function and inspect for new ingress."
+    },
+    {
+      "id": "rainfall",
+      "group": "weather",
+      "role": "risk",
+      "unit": "mm_in_72_hours",
+      "start": 20,
+      "full": 60,
+      "weight": 20,
+      "action": "Ask the responsible person to assess rainfall context during ground inspection."
+    },
+    {
+      "id": "inspection_lapse",
+      "group": "inspection",
+      "role": "risk",
+      "unit": "overdue_hours",
+      "start": 0,
+      "full": 48,
+      "weight": 25,
+      "action": "Ask the responsible person to arrange the overdue inspection and review repeated deferrals."
+    },
+    {
+      "id": "prior_instability",
+      "group": "ground_history",
+      "role": "risk",
+      "unit": "recorded_finding_present",
+      "start": 0,
+      "full": 1,
+      "weight": 15,
+      "action": "Ask a qualified person to review the recorded instability finding."
+    },
+    {
+      "id": "recent_blast",
+      "group": "excavation",
+      "role": "risk",
+      "unit": "recency_fraction_24_hours",
+      "start": 0,
+      "full": 1,
+      "weight": 10,
+      "action": "Ask the responsible person to review the post-blast inspection record; this factor does not estimate vibration."
+    },
+    {
+      "id": "pump_duty",
+      "group": "hydrology",
+      "role": "risk",
+      "unit": "multiple_of_prior_duty",
+      "start": 1.5,
+      "full": 4,
+      "weight": 20,
+      "action": "Ask the responsible person to investigate increased pumping even if level is stable."
+    },
+    {
+      "id": "unsupported_advance",
+      "group": "excavation",
+      "role": "risk",
+      "unit": "metres_beyond_recorded_support_limit",
+      "start": 0,
+      "full": 2,
+      "weight": 20,
+      "action": "Ask the responsible person to verify advance and support records against the applicable standard."
+    },
+    {
+      "id": "incident_density",
+      "group": "ground_history",
+      "role": "risk",
+      "unit": "recorded_events_in_168_hours",
+      "start": 0,
+      "full": 3,
+      "weight": 10,
+      "action": "Ask the responsible person to review the recorded incidents and near misses with the crew."
+    },
+    {
+      "id": "seasonal_context",
+      "group": "weather",
+      "role": "context",
+      "unit": "context_only",
+      "start": 0,
+      "full": 1,
+      "weight": 0,
+      "action": "Seasonal context requires a reviewed site climatology; it cannot independently trigger an alert."
+    },
+    {
+      "id": "data_staleness",
+      "group": "data_quality",
+      "role": "confidence",
+      "unit": "unevaluated_factor_count",
+      "start": 0,
+      "full": 9,
+      "weight": 0,
+      "action": "Obtain missing or current inputs; missing data is not evidence of reduced risk."
+    }
+  ],
+  "interactions": [
+    {
+      "factors": [
+        "water_rate",
+        "rainfall"
+      ],
+      "weight": 10
+    },
+    {
+      "factors": [
+        "water_rate",
+        "inspection_lapse"
+      ],
+      "weight": 15
+    },
+    {
+      "factors": [
+        "pump_duty",
+        "inspection_lapse"
+      ],
+      "weight": 10
+    },
+    {
+      "factors": [
+        "rainfall",
+        "inspection_lapse"
+      ],
+      "weight": 10
+    },
+    {
+      "factors": [
+        "water_rate",
+        "prior_instability"
+      ],
+      "weight": 10
+    },
+    {
+      "factors": [
+        "recent_blast",
+        "prior_instability"
+      ],
+      "weight": 10
+    },
+    {
+      "factors": [
+        "unsupported_advance",
+        "prior_instability"
+      ],
+      "weight": 10
+    }
+  ],
+  "change_note": "Experimental candidate: retain v0.2 pump windows and require each member of a corroborating pair to reach 0.25 normalized contribution. v0.2 allowed a nearly zero second factor to unlock an alert dominated by unrelated contributions. The 0.25 value is an unvalidated development choice selected after inspecting wet/dry scenarios; performance on those scenarios is not holdout validation.",
+  "minimum_corroboration": 0.25
+}

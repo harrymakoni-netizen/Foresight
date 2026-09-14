@@ -1,0 +1,5 @@
+export const zones = [{id:'zone-a',name:'North working',area:'Main shaft',point:'Face A1'}, {id:'zone-b',name:'East development',area:'Main shaft',point:'Sump B1'}, {id:'zone-c',name:'South working',area:'Decline',point:'Face C1'}];
+export const zoneName = (id:string) => zones.find(z=>z.id===id)?.name || id;
+export const titles:Record<string,string> = {water_rate:'Water accumulation',pump_duty:'Pump duty increase',inspection_lapse:'Inspection lapse',recent_blast:'Recent blasting',unsupported_advance:'Unsupported advance',rainfall:'Antecedent rainfall',prior_instability:'Prior instability',incident_density:'Incident history',seasonal_context:'Seasonal context',data_staleness:'Data coverage'};
+export type RecordItem = {id:string;kind:string;zone:string;data:Record<string,any>;createdAt:string};
+export const scenarioNames:Record<string,string> = {wet:'Wet-season deterioration','wet-control':'Wet-season matched control',dry:'Dry-season deterioration','dry-control':'Dry-season matched control','wet-retrospective':'Retrospective rainfall experiment'};
